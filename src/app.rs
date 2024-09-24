@@ -11,13 +11,12 @@ pub fn App() -> impl IntoView {
     provide_meta_context();
 
     view! {
-        <Stylesheet id="leptos" href="/style/output.css"/>
-        <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
         <Title text="Welcome to Leptos + Loro" />
 
         <Router>
             <Routes fallback=|| "Page not found.">
                 <Route path=StaticSegment("") view=HomePage/>
+                <Route path=StaticSegment("leptos-loro-time-travel-demo") view=HomePage/>
             </Routes>
         </Router>
     }

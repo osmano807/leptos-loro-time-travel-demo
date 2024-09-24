@@ -3,13 +3,26 @@
   <head>
     <!-- Add a plain CSS file: see https://trunkrs.dev/assets/#css -->
     <!-- If using Tailwind with Leptos CSR, see https://trunkrs.dev/assets/#tailwind instead-->
-    <link data-trunk rel="css" href="public/styles.css" />
+    <link rel="stylesheet" href="/leptos-loro-time-travel-demo/styles-cb8569231b961c6e.css" integrity="sha384&#x2D;XhokUMVPVJsfx4ndRFOfzr5iGYlJQZjlQMiiQvbJacQsTfo69NxZgSjBYCF0YB8t"/>
 
     <!-- Include favicon in dist output: see https://trunkrs.dev/assets/#icon -->
-    <link data-trunk rel="icon" href="public/favicon.ico" />
+    <link rel="icon" href="/leptos-loro-time-travel-demo/favicon-e9cbd8f50cc65bf2.ico" integrity="sha384&#x2D;YobgLXwtz0GhXVUTHml49p32guapVFlEG8UpQdDVN3kekOqkQi&#x2B;qSXEpwp&#x2B;yM4BW"/>
 
     <!-- include support for `wasm-bindgen --weak-refs` - see: https://rustwasm.github.io/docs/wasm-bindgen/reference/weak-references.html -->
-    <link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs />
-  </head>
+    
+<script type="module">
+import init, * as bindings from '/leptos-loro-time-travel-demo/leptos-loro-time-travel-demo-c664b4a9229cf3b4.js';
+const wasm = await init('/leptos-loro-time-travel-demo/leptos-loro-time-travel-demo-c664b4a9229cf3b4_bg.wasm');
+
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+  
+<link rel="modulepreload" href="/leptos-loro-time-travel-demo/leptos-loro-time-travel-demo-c664b4a9229cf3b4.js" crossorigin=anonymous integrity="sha384-Sfe48o6gbNL+IO9pUCGoCpPYd0jLTldIX7Ll+TDxGGEuJpUVNEx4JitSj6RIukhQ">
+<link rel="preload" href="/leptos-loro-time-travel-demo/leptos-loro-time-travel-demo-c664b4a9229cf3b4_bg.wasm" crossorigin=anonymous integrity="sha384-AyCeNFsVjQLTpyADj5V/29jBYUNKGAHfItEBw1FjV9i+jS7cA0FlEe8pHZSpgmwx" as="fetch" type="application/wasm"></head>
   <body></body>
 </html>

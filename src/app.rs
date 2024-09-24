@@ -1,48 +1,24 @@
 use leptos::prelude::*;
-use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
+use leptos_meta::*;
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment,
 };
-
 use loro::LoroDoc;
-
-pub fn shell(options: LeptosOptions) -> impl IntoView {
-    view! {
-        <!DOCTYPE html>
-        <html lang="en">
-            <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <AutoReload options=options.clone() />
-                <HydrationScripts options />
-                <MetaTags />
-            </head>
-            <body>
-                <App />
-            </body>
-        </html>
-    }
-}
 
 #[component]
 pub fn App() -> impl IntoView {
-    // Provides context that manages stylesheets, titles, meta tags, etc.
     provide_meta_context();
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/leptos-loro-time-travel-demo.css" />
-
-        // sets the document title
+        <Stylesheet id="leptos" href="/style/output.css"/>
+        <Link rel="shortcut icon" type_="image/ico" href="/favicon.ico"/>
         <Title text="Welcome to Leptos + Loro" />
 
-        // content for this welcome page
         <Router>
-            <main>
-                <Routes fallback=|| "Page not found.".into_view()>
-                    <Route path=StaticSegment("") view=HomePage />
-                </Routes>
-            </main>
+            <Routes fallback=|| "Page not found.">
+                <Route path=StaticSegment("") view=HomePage/>
+            </Routes>
         </Router>
     }
 }
@@ -60,37 +36,30 @@ fn HomePage() -> impl IntoView {
 
     let text = RwSignal::new(String::new());
 
-    let loro_doc_snapshot = Resource::new(|| (), |_| async move { get_loro_doc().await.unwrap() });
+    // See the README for instructions on how to generate the snapshot
+    let snapshot = include_bytes!("../public/seph-blog1.loro-snapshot");
+
+    doc.update_value(|doc| {
+        doc.import(snapshot.as_slice()).unwrap();
+    });
+    let frontiers = doc.with_value(|doc| doc.state_frontiers());
+    let last = frontiers.last().cloned();
+    leptos::logging::log!("Last version: {:#?}", last);
+    last_loro_id.set(last);
+    max_version.set(last.map(|id| id.counter).unwrap_or(0));
 
     view! {
         <h1>"Welcome to Leptos + Loro!"</h1>
         <div style="width: calc(100% - 32px); padding: 16px;">
-            <Suspense fallback=|| {
-                "Loading...".into_view()
-            }>
-                {move || Suspend::new(async move {
-                    let snapshot = loro_doc_snapshot.await;
-                    doc.update_value(|doc| {
-                        doc.import(snapshot.as_slice()).unwrap();
-                    });
-                    let frontiers = doc.with_value(|doc| doc.state_frontiers());
-                    let last = frontiers.last().cloned();
-                    leptos::logging::log!("Last version: {:#?}", last);
-                    last_loro_id.set(last);
-                    max_version.set(last.map(|id| id.counter).unwrap_or(0));
-                    view! {
-                        <RangeSelect
-                            version=version
-                            max_version=max_version.into()
-                            doc=doc
-                            text=text
-                            last_loro_id=last_loro_id.into()
-                            checkout_time=checkout_time
-                        />
-                        <RenderText text=text.into() checkout_time=checkout_time.into() />
-                    }
-                })}
-            </Suspense>
+            <RangeSelect
+                version=version
+                max_version=max_version.into()
+                doc=doc
+                text=text
+                last_loro_id=last_loro_id.into()
+                checkout_time=checkout_time
+            />
+            <RenderText text=text.into() checkout_time=checkout_time.into() />
         </div>
     }
 }
@@ -173,59 +142,3 @@ fn RenderText(text: Signal<String>, checkout_time: Signal<f64>) -> impl IntoView
         </div>
     }
 }
-
-#[server]
-async fn get_loro_doc() -> Result<LoroDocSnapshot, ServerFnError> {
-    // Sample data from https://github.com/josephg/editing-traces
-    use serde::Deserialize;
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct SequentialTrace {
-        start_content: String,
-        end_content: String,
-        txns: Vec<Transaction>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Transaction {
-        time: String,
-        patches: Vec<Patch>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct Patch {
-        position: usize,
-        num_deleted: usize,
-        insert_content: String,
-    }
-
-    let seph_blog1_json_gz = include_bytes!("../public/seph-blog1.json.gz");
-
-    use flate2::read::GzDecoder;
-    let decoder = GzDecoder::new(seph_blog1_json_gz.as_slice());
-
-    let seph_blog1_trace = serde_json::from_reader::<_, SequentialTrace>(decoder).unwrap();
-
-    let doc = LoroDoc::new();
-    let text = doc.get_text("text");
-    text.insert(0, seph_blog1_trace.start_content.as_str())
-        .unwrap();
-
-    seph_blog1_trace.txns.iter().for_each(|txn| {
-        _ = txn.time;
-        txn.patches.iter().for_each(|patch| {
-            text.splice(
-                patch.position,
-                patch.num_deleted,
-                patch.insert_content.as_str(),
-            )
-            .unwrap();
-        });
-    });
-
-    assert_eq!(text.to_string(), seph_blog1_trace.end_content);
-
-    Ok(doc.export_snapshot())
-}
-
-type LoroDocSnapshot = Vec<u8>;

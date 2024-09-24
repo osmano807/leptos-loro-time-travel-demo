@@ -15,5 +15,6 @@ The editing trace is from [josephg/editing-traces](https://github.com/josephg/ed
 3. Open `http://localhost:8000` in your browser
 
 # Deploying
+
 1. Run `trunk build --release`
 2. Copy the contents of `dist` to your web server

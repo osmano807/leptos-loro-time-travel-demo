@@ -7,6 +7,7 @@ use leptos_router::{
     StaticSegment,
 };
 use loro::LoroDoc;
+use std::ops::ControlFlow;
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -17,8 +18,8 @@ pub fn App() -> impl IntoView {
 
         <Router>
             <Routes fallback=|| "Page not found.">
-                <Route path=StaticSegment("") view=HomePage/>
-                <Route path=StaticSegment("leptos-loro-time-travel-demo") view=HomePage/>
+                <Route path=StaticSegment("") view=HomePage />
+                <Route path=StaticSegment("leptos-loro-time-travel-demo") view=HomePage />
             </Routes>
         </Router>
     }
@@ -31,7 +32,6 @@ fn HomePage() -> impl IntoView {
 
     let version = RwSignal::new(-1);
     let max_version = RwSignal::new(0);
-    let last_loro_id = RwSignal::new(None);
 
     let checkout_stats = RwSignal::new(CheckoutStats::new());
 
@@ -43,11 +43,27 @@ fn HomePage() -> impl IntoView {
     doc.update_value(|doc| {
         doc.import(snapshot.as_slice()).unwrap();
     });
-    let frontiers = doc.with_value(|doc| doc.state_frontiers());
-    let last = frontiers.last().cloned();
-    leptos::logging::log!("Last version: {:#?}", last);
-    last_loro_id.set(last);
-    max_version.set(last.map(|id| id.counter).unwrap_or(0));
+
+    let last_frontiers = doc.with_value(|doc| doc.state_frontiers());
+
+    let mut frontiers = vec![];
+    doc.with_value(|doc| {
+        doc.travel_change_ancestors(last_frontiers[0], &mut |meta| {
+            // For all inner changes
+            for counter in (meta.id.counter..meta.id.counter + meta.len as i32).rev() {
+                frontiers.push(loro::ID::new(meta.id.peer, counter));
+            }
+            // For changes only
+            /* frontiers
+                .push(loro::ID::new(meta.id.peer, meta.id.counter + meta.len as i32 - 1)); */
+            ControlFlow::Continue(())
+        })
+    });
+    frontiers.reverse();
+
+    max_version.set(frontiers.len() as i32 - 1); // 0 based index
+
+    let frontiers = StoredValue::new(frontiers);
 
     view! {
         <h1>"Welcome to Leptos + Loro!"</h1>
@@ -57,7 +73,7 @@ fn HomePage() -> impl IntoView {
                 max_version=max_version.into()
                 doc=doc
                 text=text
-                last_loro_id=last_loro_id.into()
+                frontiers=frontiers
                 checkout_stats=checkout_stats
             />
             <RenderText text=text.into() checkout_stats=checkout_stats.into() />
@@ -71,7 +87,7 @@ fn RangeSelect(
     max_version: Signal<i32>,
     doc: StoredValue<LoroDoc>,
     text: RwSignal<String>,
-    last_loro_id: Signal<Option<loro::ID>>,
+    frontiers: StoredValue<Vec<loro::ID>>,
     checkout_stats: RwSignal<CheckoutStats>,
 ) -> impl IntoView {
     let range_on_input = leptos_use::use_throttle_fn_with_arg(
@@ -79,25 +95,24 @@ fn RangeSelect(
             let new_value = event_target_value(&ev).parse::<i32>().unwrap();
             version.set(new_value);
 
-            let ts_start = performance_now();
+            let ts_start: f64;
 
             let ts_end: f64;
 
             if new_value == -1 {
+                ts_start = performance_now();
                 doc.update_value(|doc| doc.checkout(&[].into()));
                 ts_end = performance_now();
                 text.set("".to_string());
             } else {
-                let new_loro_id = loro::ID {
-                    peer: last_loro_id.get().unwrap().peer,
-                    counter: new_value,
-                };                
-                doc.update_value(|doc| doc.checkout(&new_loro_id.into()));
+                let frontier = frontiers.with_value(|frontiers| frontiers[new_value as usize]);
+                ts_start = performance_now();
+                doc.update_value(|doc| doc.checkout(&frontier.into()));
                 ts_end = performance_now();
                 // As in the original example, we don't count the time it takes to read from the LoroDoc
                 text.set(doc.with_value(|doc| doc.get_text("text").to_string()));
             }
-            
+
             checkout_stats.update(|checkout_stats| {
                 checkout_stats.add(ts_end - ts_start);
             });
@@ -128,13 +143,60 @@ fn RenderText(text: Signal<String>, checkout_stats: Signal<CheckoutStats>) -> im
     view! {
         <div style="display: flex; justify-content: space-between; font-family: monospace;">
             <span style="margin-right: 2em;">
-                "Checkout duration: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.checkout_time.last()))} " ms"
+                "Checkout duration: "
+                {move || {
+                    format!(
+                        "{:.2}",
+                        checkout_stats.with(|checkout_stats| checkout_stats.checkout_time.last()),
+                    )
+                }} " ms"
             </span>
-            <span>"Min: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.min.min()))} " ms"</span>
-            <span>"Max: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.max.max()))} " ms"</span>
-            <span>"Mean: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.mean()))} " ms"</span>
-            <span>"Variance: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.sample_variance()))} " ms²"</span>
-            <span>"Standard Deviation: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.sample_variance().sqrt()))} " ms"</span>
+            <span>
+                "Min: "
+                {move || {
+                    format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.min.min()))
+                }} " ms"
+            </span>
+            <span>
+                "Max: "
+                {move || {
+                    format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.max.max()))
+                }} " ms"
+            </span>
+            <span>
+                "Mean: "
+                {move || {
+                    format!(
+                        "{:.2}",
+                        checkout_stats.with(|checkout_stats| checkout_stats.variance.mean()),
+                    )
+                }} " ± " {move || {
+                    format!(
+                        "{:.2}",
+                        checkout_stats.with(|checkout_stats| checkout_stats.variance.error()),
+                    )
+                }} " ms"
+            </span>
+            <span>
+                "Variance: "
+                {move || {
+                    format!(
+                        "{:.2}",
+                        checkout_stats
+                            .with(|checkout_stats| checkout_stats.variance.sample_variance()),
+                    )
+                }} " ms²"
+            </span>
+            <span>
+                "Standard Deviation: "
+                {move || {
+                    format!(
+                        "{:.2}",
+                        checkout_stats
+                            .with(|checkout_stats| checkout_stats.variance.sample_variance().sqrt()),
+                    )
+                }} " ms"
+            </span>
             <span>"Text length: " {move || text.get().len()}</span>
         </div>
         <div style="position: relative; margin-top: 8px; transform: scale(1.075); transform-origin: 0px 0px 0px; text-align: left;">
@@ -151,7 +213,7 @@ fn RenderText(text: Signal<String>, checkout_stats: Signal<CheckoutStats>) -> im
     }
 }
 
-use average::{concatenate, Estimate, Variance, Max, Min};
+use average::{concatenate, Estimate, Max, Min, Variance};
 
 struct CheckoutTime(f64);
 
@@ -175,7 +237,7 @@ impl Default for CheckoutTime {
 concatenate!(
     CheckoutStats,
     [CheckoutTime, checkout_time, last],
-    [Variance, variance, mean, sample_variance],
+    [Variance, variance, mean, error, sample_variance],
     [Min, min, min],
     [Max, max, max]
 );

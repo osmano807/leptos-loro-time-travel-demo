@@ -14,7 +14,7 @@ console_log = "1"
 log = "0.4"
 console_error_panic_hook = "0.1"
 
-loro = {git = "https://github.com/loro-dev/loro.git", rev = "refs/pull/475/head"}
+loro = { git = "https://github.com/loro-dev/loro.git", branch = "dev" }
 #loro = "*"
 
 leptos-use = { git = "https://github.com/Synphonyte/leptos-use.git", branch = "leptos-0.7", default-features = false, features = [

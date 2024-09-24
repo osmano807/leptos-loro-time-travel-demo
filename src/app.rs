@@ -114,8 +114,9 @@ fn RangeSelect(
             let ts_end: f64;
 
             if new_value == -1 {
-                doc.update_value(|doc| doc.checkout_to_latest());
+                doc.update_value(|doc| doc.checkout(&[].into()));
                 ts_end = leptos_use::use_timestamp().get();
+                text.set("".to_string());
             } else {
                 let new_loro_id = loro::ID {
                     peer: last_loro_id.get().unwrap().peer,
@@ -129,7 +130,7 @@ fn RangeSelect(
             
             checkout_time.set(ts_end - ts_start);
         },
-        250.0,
+        100.0,
     );
 
     view! {

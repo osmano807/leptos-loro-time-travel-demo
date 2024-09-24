@@ -18,10 +18,10 @@ loro = {git = "https://github.com/loro-dev/loro.git", rev = "refs/pull/475/head"
 #loro = "*"
 
 leptos-use = { git = "https://github.com/Synphonyte/leptos-use.git", branch = "leptos-0.7", default-features = false, features = [
-  "use_debounce_fn",
   "use_throttle_fn",
-  "use_timestamp",
 ] }
+
+web-sys = { version = "0.3", features = ["Performance"] }
 
 # Fix build error
 getrandom = { version = "0.2", features = ["js"] }

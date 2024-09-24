@@ -1,3 +1,5 @@
+use core::f64;
+
 use leptos::prelude::*;
 use leptos_meta::*;
 use leptos_router::{
@@ -77,13 +79,13 @@ fn RangeSelect(
             let new_value = event_target_value(&ev).parse::<i32>().unwrap();
             version.set(new_value);
 
-            let ts_start = leptos_use::use_timestamp().get();
+            let ts_start = performance_now();
 
             let ts_end: f64;
 
             if new_value == -1 {
                 doc.update_value(|doc| doc.checkout(&[].into()));
-                ts_end = leptos_use::use_timestamp().get();
+                ts_end = performance_now();
                 text.set("".to_string());
             } else {
                 let new_loro_id = loro::ID {
@@ -91,7 +93,7 @@ fn RangeSelect(
                     counter: new_value,
                 };                
                 doc.update_value(|doc| doc.checkout(&new_loro_id.into()));
-                ts_end = leptos_use::use_timestamp().get();
+                ts_end = performance_now();
                 // As in the original example, we don't count the time it takes to read from the LoroDoc
                 text.set(doc.with_value(|doc| doc.get_text("text").to_string()));
             }
@@ -155,7 +157,7 @@ struct CheckoutTime(f64);
 
 impl CheckoutTime {
     fn new() -> Self {
-        Self(0.0)
+        Self(f64::INFINITY)
     }
     fn add(&mut self, value: f64) {
         self.0 = value;
@@ -177,3 +179,11 @@ concatenate!(
     [Min, min, min],
     [Max, max, max]
 );
+
+fn performance_now() -> f64 {
+    web_sys::window()
+        .expect("should have a Window")
+        .performance()
+        .expect("should have a Performance")
+        .now()
+}

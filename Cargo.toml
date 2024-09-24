@@ -14,7 +14,8 @@ console_log = "1"
 log = "0.4"
 console_error_panic_hook = "0.1"
 
-loro = "0.16.12"
+loro = {git = "https://github.com/loro-dev/loro.git", rev = "refs/pull/475/head"}
+#loro = "*"
 
 leptos-use = { git = "https://github.com/Synphonyte/leptos-use.git", branch = "leptos-0.7", default-features = false, features = [
   "use_debounce_fn",
@@ -24,6 +25,8 @@ leptos-use = { git = "https://github.com/Synphonyte/leptos-use.git", branch = "l
 
 # Fix build error
 getrandom = { version = "0.2", features = ["js"] }
+
+average = "0.15.1"
 
 # utils
 # strum = { version = "0.25", features = ["derive", "strum_macros"] }

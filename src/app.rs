@@ -31,7 +31,7 @@ fn HomePage() -> impl IntoView {
     let max_version = RwSignal::new(0);
     let last_loro_id = RwSignal::new(None);
 
-    let checkout_time = RwSignal::new(0.0);
+    let checkout_stats = RwSignal::new(CheckoutStats::new());
 
     let text = RwSignal::new(String::new());
 
@@ -56,9 +56,9 @@ fn HomePage() -> impl IntoView {
                 doc=doc
                 text=text
                 last_loro_id=last_loro_id.into()
-                checkout_time=checkout_time
+                checkout_stats=checkout_stats
             />
-            <RenderText text=text.into() checkout_time=checkout_time.into() />
+            <RenderText text=text.into() checkout_stats=checkout_stats.into() />
         </div>
     }
 }
@@ -70,7 +70,7 @@ fn RangeSelect(
     doc: StoredValue<LoroDoc>,
     text: RwSignal<String>,
     last_loro_id: Signal<Option<loro::ID>>,
-    checkout_time: RwSignal<f64>,
+    checkout_stats: RwSignal<CheckoutStats>,
 ) -> impl IntoView {
     let range_on_input = leptos_use::use_throttle_fn_with_arg(
         move |ev: leptos::ev::Event| {
@@ -96,7 +96,9 @@ fn RangeSelect(
                 text.set(doc.with_value(|doc| doc.get_text("text").to_string()));
             }
             
-            checkout_time.set(ts_end - ts_start);
+            checkout_stats.update(|checkout_stats| {
+                checkout_stats.add(ts_end - ts_start);
+            });
         },
         100.0,
     );
@@ -120,12 +122,17 @@ fn RangeSelect(
 }
 
 #[component]
-fn RenderText(text: Signal<String>, checkout_time: Signal<f64>) -> impl IntoView {
+fn RenderText(text: Signal<String>, checkout_stats: Signal<CheckoutStats>) -> impl IntoView {
     view! {
         <div style="display: flex; justify-content: space-between; font-family: monospace;">
             <span style="margin-right: 2em;">
-                "Checkout duration: " {move || format!("{:.2}", checkout_time.get())} " ms"
+                "Checkout duration: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.checkout_time.last()))} " ms"
             </span>
+            <span>"Min: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.min.min()))} " ms"</span>
+            <span>"Max: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.max.max()))} " ms"</span>
+            <span>"Mean: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.mean()))} " ms"</span>
+            <span>"Variance: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.sample_variance()))} " ms²"</span>
+            <span>"Standard Deviation: " {move || format!("{:.2}", checkout_stats.with(|checkout_stats| checkout_stats.variance.sample_variance().sqrt()))} " ms"</span>
             <span>"Text length: " {move || text.get().len()}</span>
         </div>
         <div style="position: relative; margin-top: 8px; transform: scale(1.075); transform-origin: 0px 0px 0px; text-align: left;">
@@ -141,3 +148,32 @@ fn RenderText(text: Signal<String>, checkout_time: Signal<f64>) -> impl IntoView
         </div>
     }
 }
+
+use average::{concatenate, Estimate, Variance, Max, Min};
+
+struct CheckoutTime(f64);
+
+impl CheckoutTime {
+    fn new() -> Self {
+        Self(0.0)
+    }
+    fn add(&mut self, value: f64) {
+        self.0 = value;
+    }
+    fn last(&self) -> f64 {
+        self.0
+    }
+}
+impl Default for CheckoutTime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+concatenate!(
+    CheckoutStats,
+    [CheckoutTime, checkout_time, last],
+    [Variance, variance, mean, sample_variance],
+    [Min, min, min],
+    [Max, max, max]
+);
